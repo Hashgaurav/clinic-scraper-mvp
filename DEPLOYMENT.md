@@ -82,7 +82,7 @@
 ## Environment Configuration
 
 ### Required
-- None (works out of the box)
+- `TARGET_CLINIC_URL`: The clinic booking URL to scrape
 
 ### Optional
 - `PROXY_LIST`: Comma-separated proxy URLs for rotation

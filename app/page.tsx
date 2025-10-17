@@ -24,7 +24,7 @@ interface ScrapingResult {
   rawData?: any;
 }
 
-const ASPIT_TEST_URL = 'https://timebestilling.aspit.no/#/p3775/services/15/appointment/54/calendar#calendar-title';
+// URL will be loaded from environment variables
 
 export default function Home() {
   const [loading, setLoading] = useState(false);
@@ -40,7 +40,8 @@ export default function Home() {
     setSelectedDate(null);
 
     try {
-      const response = await fetch(`/api/scrape?url=${encodeURIComponent(ASPIT_TEST_URL)}`);
+      // Get the target URL from environment variables
+      const response = await fetch('/api/scrape');
       const data = await response.json();
 
       if (!response.ok) {
@@ -159,7 +160,7 @@ export default function Home() {
               <div className="p-6">
                 <div className="bg-gray-50 rounded-lg p-4 border-l-4 border-blue-500">
                   <p className="text-sm text-gray-600 break-all font-mono">
-                    {ASPIT_TEST_URL}
+                    Target URL configured via environment variables
                   </p>
                 </div>
                 <button

@@ -82,16 +82,16 @@ A minimal proof-of-concept scraper for extracting appointment availability from 
 Create a `.env.local` file:
 
 ```env
+# Required: Target clinic URL to scrape
+TARGET_CLINIC_URL=https://timebestilling.aspit.no/#/p3775/services/15/appointment/54/calendar#calendar-title
+
 # Optional: Comma-separated list of proxy URLs
 PROXY_LIST=http://proxy1:port,http://proxy2:port
 ```
 
 ### Target URL
 
-The scraper is currently configured for:
-```
-https://timebestilling.aspit.no/#/p3775/services/15/appointment/54/calendar#calendar-title
-```
+The scraper URL is configured via the `TARGET_CLINIC_URL` environment variable. This ensures the target URL is not exposed in the public repository for security purposes.
 
 ## 📊 Data Structure
 

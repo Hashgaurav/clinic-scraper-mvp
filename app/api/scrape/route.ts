@@ -7,19 +7,21 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const url = searchParams.get('url');
-    const proxy = searchParams.get('proxy') || undefined;
+    // Get the target URL from environment variables
+    const targetUrl = process.env.TARGET_CLINIC_URL;
     
-    if (!url) {
+    if (!targetUrl) {
       return NextResponse.json(
-        { error: 'URL parameter is required' },
-        { status: 400 }
+        { error: 'TARGET_CLINIC_URL environment variable is not configured' },
+        { status: 500 }
       );
     }
     
+    const { searchParams } = new URL(request.url);
+    const proxy = searchParams.get('proxy') || undefined;
+    
     // Check cache first
-    const cacheKey = `${url}-${proxy || 'no-proxy'}`;
+    const cacheKey = `${targetUrl}-${proxy || 'no-proxy'}`;
     const cached = cache.get(cacheKey);
     
     if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
@@ -31,10 +33,10 @@ export async function GET(request: NextRequest) {
       });
     }
     
-    console.log(`Scraping URL: ${url}`);
+    console.log('Scraping target URL from environment variables');
     
     // Scrape the data
-    const result = await scrapeAspit(url, proxy);
+    const result = await scrapeAspit(targetUrl, proxy);
     
     // Cache the result
     cache.set(cacheKey, {
