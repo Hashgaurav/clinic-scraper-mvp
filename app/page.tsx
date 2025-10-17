@@ -1,103 +1,515 @@
-import Image from "next/image";
+'use client';
+
+import { useState } from 'react';
+
+interface AvailabilitySlot {
+  date: string;
+  time: string;
+  doctor?: string;
+}
+
+interface AvailableDate {
+  date: string;
+  count: number;
+}
+
+interface ScrapingResult {
+  clinic: string;
+  availableDates: AvailableDate[];
+  slots: AvailabilitySlot[];
+  error?: string;
+  cached?: boolean;
+  cacheAge?: number;
+  scrapedAt?: string;
+  rawData?: any;
+}
+
+const ASPIT_TEST_URL = 'https://timebestilling.aspit.no/#/p3775/services/15/appointment/54/calendar#calendar-title';
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<ScrapingResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  const handleScrape = async () => {
+    setLoading(true);
+    setError(null);
+    setResult(null);
+    setSelectedDate(null);
+
+    try {
+      const response = await fetch(`/api/scrape?url=${encodeURIComponent(ASPIT_TEST_URL)}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to scrape data');
+      }
+
+      setResult(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+  };
+
+  const getSlotsForSelectedDate = (slots: AvailabilitySlot[], date: string) => {
+    return slots.filter(slot => slot.date === date);
+  };
+
+  const handleDateSelect = (date: string) => {
+    setSelectedDate(date);
+  };
+
+  const navigateMonth = (direction: 'prev' | 'next') => {
+    setCurrentMonth(prev => {
+      const newMonth = new Date(prev);
+      if (direction === 'prev') {
+        newMonth.setMonth(prev.getMonth() - 1);
+      } else {
+        newMonth.setMonth(prev.getMonth() + 1);
+      }
+      return newMonth;
+    });
+    setSelectedDate(null); // Clear selected date when changing months
+  };
+
+  const formatMonthYear = (date: Date) => {
+    return date.toLocaleDateString('en-US', { 
+      month: 'long', 
+      year: 'numeric' 
+    });
+  };
+
+  const getAvailableDatesForMonth = (month: Date) => {
+    if (!result) return [];
+    
+    const monthStr = month.toISOString().slice(0, 7); // YYYY-MM format
+    return result.availableDates.filter(date => 
+      date.date.startsWith(monthStr) && date.count > 0
+    );
+  };
+
+  const getMonthsWithAppointments = () => {
+    if (!result) return [];
+    
+    const months = new Set<string>();
+    result.availableDates
+      .filter(date => date.count > 0)
+      .forEach(date => {
+        const monthStr = date.date.slice(0, 7); // YYYY-MM format
+        months.add(monthStr);
+      });
+    
+    return Array.from(months).sort().map(monthStr => {
+      const [year, month] = monthStr.split('-');
+      const date = new Date(parseInt(year), parseInt(month) - 1);
+      const count = result.availableDates
+        .filter(d => d.date.startsWith(monthStr) && d.count > 0)
+        .reduce((sum, d) => sum + d.count, 0);
+      
+      return { monthStr, date, count };
+    });
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+      {/* Header */}
+      <div className="bg-white shadow-sm border-b">
+        <div className="max-w-6xl mx-auto px-4 py-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">
+                🏥 Clinic Availability Scraper
+              </h1>
+              <p className="text-gray-600 mt-1">Real-time appointment availability monitoring</p>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+              <span className="text-sm text-gray-600">Live</span>
+            </div>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      </div>
+
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          
+          {/* Main Content */}
+          <div className="lg:col-span-2 space-y-6">
+            
+            {/* Target Clinic Card */}
+            <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
+              <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
+                <h2 className="text-xl font-semibold text-white">Target Clinic</h2>
+                <p className="text-blue-100 text-sm mt-1">Aspit Booking System</p>
+              </div>
+              <div className="p-6">
+                <div className="bg-gray-50 rounded-lg p-4 border-l-4 border-blue-500">
+                  <p className="text-sm text-gray-600 break-all font-mono">
+                    {ASPIT_TEST_URL}
+                  </p>
+                </div>
+                <button
+                  onClick={handleScrape}
+                  disabled={loading}
+                  className="mt-4 w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 flex items-center justify-center gap-3 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                >
+                  {loading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                      <span>Scraping Availability...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                      <span>Fetch Availability</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Results Section */}
+            {error && (
+              <div className="bg-white rounded-xl shadow-lg border border-red-200 overflow-hidden">
+                <div className="bg-red-50 px-6 py-4 border-b border-red-200">
+                  <h3 className="text-lg font-semibold text-red-800 flex items-center gap-2">
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                    Error
+                  </h3>
+                </div>
+                <div className="p-6">
+                  <p className="text-red-700">{error}</p>
+                </div>
+              </div>
+            )}
+
+            {result && (
+              <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
+                <div className="bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-4">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-xl font-semibold text-white">Scraping Results</h2>
+                    <div className="flex items-center gap-2">
+                      {result.cached ? (
+                        <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
+                          📋 Cached ({result.cacheAge}s ago)
+                        </span>
+                      ) : (
+                        <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
+                          🔄 Fresh ({result.scrapedAt ? new Date(result.scrapedAt).toLocaleTimeString() : 'now'})
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="p-6 space-y-6">
+                  
+                  {/* Clinic Info */}
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <h3 className="font-semibold text-gray-800 mb-2">🏥 {result.clinic}</h3>
+                    {result.error && (
+                      <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <p className="text-yellow-800 text-sm">⚠️ {result.error}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Month Navigation Calendar */}
+                  {result.availableDates.filter(date => date.count > 0).length === 0 ? (
+                    <div className="text-center py-12">
+                      <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                      </div>
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">No Available Dates</h3>
+                      <p className="text-gray-500">No appointment dates were found. This could mean no appointments are available or the scraper needs adjustment.</p>
+                    </div>
+                  ) : (
+                    <div>
+                      {/* Month Navigation Header */}
+                      <div className="flex items-center justify-between mb-6">
+                        <h3 className="text-lg font-semibold text-gray-800">
+                          📅 Browse Available Dates
+                        </h3>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => navigateMonth('prev')}
+                            className="p-2 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors"
+                            title="Previous month"
+                          >
+                            <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                            </svg>
+                          </button>
+                          
+                          <div className="px-4 py-2 bg-white border border-gray-200 rounded-lg min-w-[140px] text-center">
+                            <span className="font-medium text-gray-900">{formatMonthYear(currentMonth)}</span>
+                          </div>
+                          
+                          <button
+                            onClick={() => navigateMonth('next')}
+                            className="p-2 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors"
+                            title="Next month"
+                          >
+                            <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Month Overview - Quick Jump */}
+                      {getMonthsWithAppointments().length > 1 && (
+                        <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                          <h4 className="text-sm font-semibold text-blue-800 mb-3">📆 Quick Jump to Months with Appointments</h4>
+                          <div className="flex flex-wrap gap-2">
+                            {getMonthsWithAppointments().map(({ monthStr, date, count }) => (
+                              <button
+                                key={monthStr}
+                                onClick={() => {
+                                  setCurrentMonth(date);
+                                  setSelectedDate(null);
+                                }}
+                                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                  currentMonth.toISOString().slice(0, 7) === monthStr
+                                    ? 'bg-blue-600 text-white'
+                                    : 'bg-white text-blue-700 border border-blue-300 hover:bg-blue-100'
+                                }`}
+                              >
+                                {formatMonthYear(date)} ({count} slots)
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Current Month Available Dates */}
+                      {getAvailableDatesForMonth(currentMonth).length === 0 ? (
+                        <div className="text-center py-8 bg-gray-50 rounded-lg border border-gray-200">
+                          <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-3">
+                            <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                          </div>
+                          <p className="text-gray-600 font-medium">No appointments in {formatMonthYear(currentMonth)}</p>
+                          <p className="text-sm text-gray-500 mt-1">Try navigating to another month</p>
+                        </div>
+                      ) : (
+                        <div>
+                          <div className="flex items-center justify-between mb-4">
+                            <span className="text-sm text-gray-600">
+                              {getAvailableDatesForMonth(currentMonth).length} date{getAvailableDatesForMonth(currentMonth).length !== 1 ? 's' : ''} with appointments in {formatMonthYear(currentMonth)}
+                            </span>
+                          </div>
+                          
+                          {/* Date Selection Grid for Current Month */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
+                            {getAvailableDatesForMonth(currentMonth).map((availableDate) => (
+                              <button
+                                key={availableDate.date}
+                                onClick={() => handleDateSelect(availableDate.date)}
+                                className={`p-4 rounded-lg border-2 transition-all duration-200 text-left ${
+                                  selectedDate === availableDate.date
+                                    ? 'border-blue-500 bg-blue-50 shadow-md'
+                                    : 'border-gray-200 bg-white hover:border-blue-300 hover:shadow-sm'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <p className="font-medium text-gray-900">{formatDate(availableDate.date)}</p>
+                                    <p className="text-sm text-gray-600">
+                                      {availableDate.count} slot{availableDate.count !== 1 ? 's' : ''}
+                                    </p>
+                                  </div>
+                                  <div className={`w-3 h-3 rounded-full ${
+                                    selectedDate === availableDate.date ? 'bg-blue-500' : 'bg-gray-300'
+                                  }`}></div>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Time Slots for Selected Date */}
+                      {selectedDate && (
+                        <div className="border-t border-gray-200 pt-6">
+                          <div className="flex items-center justify-between mb-4">
+                            <h4 className="text-lg font-semibold text-gray-800">
+                              🕐 Available Times for {formatDate(selectedDate)}
+                            </h4>
+                            <span className="text-sm text-gray-500">
+                              {getSlotsForSelectedDate(result.slots, selectedDate).length} time slot{getSlotsForSelectedDate(result.slots, selectedDate).length !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                          
+                          {getSlotsForSelectedDate(result.slots, selectedDate).length === 0 ? (
+                            <div className="text-center py-8">
+                              <p className="text-gray-500">No time slots found for this date.</p>
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              {getSlotsForSelectedDate(result.slots, selectedDate).map((slot, index) => (
+                                <div key={index} className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                                        <span className="text-blue-600 font-semibold">
+                                          {slot.time}
+                                        </span>
+                                      </div>
+                                      <div>
+                                        <p className="font-medium text-gray-900">{slot.time}</p>
+                                        {slot.doctor && (
+                                          <p className="text-sm text-gray-600">👨‍⚕️ {slot.doctor}</p>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="text-right">
+                                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                                        Available
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Raw Data Section */}
+                  {result.rawData && (
+                    <div className="border-t border-gray-200 pt-6">
+                      <details className="group">
+                        <summary className="cursor-pointer flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                          <span className="font-medium text-gray-700">
+                            🔍 Raw API Data ({Array.isArray(result.rawData) ? result.rawData.length : 0} responses)
+                          </span>
+                          <svg className="w-5 h-5 text-gray-500 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </summary>
+                        <div className="mt-4 bg-gray-900 rounded-lg overflow-hidden">
+                          <pre className="p-4 text-green-400 text-xs overflow-auto max-h-96">
+                            {JSON.stringify(result.rawData, null, 2)}
+                          </pre>
+                        </div>
+                      </details>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Sidebar */}
+          <div className="space-y-6">
+            
+            {/* Status Card */}
+            <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">📊 System Status</h3>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">Node.js Version</span>
+                  <span className="text-sm font-medium text-green-600">18.20.8</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">Playwright</span>
+                  <span className="text-sm font-medium text-green-600">Active</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">Proxy Support</span>
+                  <span className="text-sm font-medium text-blue-600">Available</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">Cache TTL</span>
+                  <span className="text-sm font-medium text-gray-600">5 minutes</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Features Card */}
+            <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">✨ Features</h3>
+              <ul className="space-y-2 text-sm text-gray-600">
+                <li className="flex items-center gap-2">
+                  <span className="w-2 h-2 bg-green-400 rounded-full"></span>
+                  Real-time scraping
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="w-2 h-2 bg-green-400 rounded-full"></span>
+                  XHR interception
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="w-2 h-2 bg-green-400 rounded-full"></span>
+                  Doctor mapping
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="w-2 h-2 bg-green-400 rounded-full"></span>
+                  In-memory caching
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="w-2 h-2 bg-green-400 rounded-full"></span>
+                  Proxy rotation
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="w-2 h-2 bg-green-400 rounded-full"></span>
+                  Error handling
+                </li>
+              </ul>
+            </div>
+
+            {/* MVP Notes */}
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200 p-6">
+              <h3 className="text-lg font-semibold text-blue-800 mb-3">📝 MVP Notes</h3>
+              <ul className="space-y-2 text-sm text-blue-700">
+                <li className="flex items-start gap-2">
+                  <span className="text-blue-500 mt-1">•</span>
+                  <span>Proof-of-concept for client demonstration</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-blue-500 mt-1">•</span>
+                  <span>5-minute in-memory caching</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-blue-500 mt-1">•</span>
+                  <span>No database - ephemeral results</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-blue-500 mt-1">•</span>
+                  <span>Manual triggering only</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-blue-500 mt-1">•</span>
+                  <span>Ready for production expansion</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

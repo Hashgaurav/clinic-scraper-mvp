@@ -1,36 +1,197 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🏥 Clinic Availability Scraper MVP
 
-## Getting Started
+A minimal proof-of-concept scraper for extracting appointment availability from clinic booking systems. Built for client demonstration purposes.
 
-First, run the development server:
+## ✨ Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- **Real-time scraping** of Aspit booking system
+- **Month navigation calendar** with date selection
+- **XHR interception** to capture API responses
+- **Doctor mapping** with appointment details
+- **In-memory caching** (5-minute TTL)
+- **Proxy rotation** support
+- **Professional UI** with responsive design
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Node.js 18+ (we use 18.20.8)
+- npm or yarn
+
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd scrapper-mvp
+   ```
+
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
+
+3. **Install Playwright browsers**
+   ```bash
+   npx playwright install chromium
+   ```
+
+4. **Start the development server**
+   ```bash
+   npm run dev
+   ```
+
+5. **Open your browser**
+   Navigate to [http://localhost:3000](http://localhost:3000)
+
+## 🎯 Usage
+
+1. **Click "Fetch Availability"** to scrape the Aspit booking system
+2. **Navigate months** using the arrow buttons or quick jump
+3. **Select a date** to view available time slots
+4. **View appointment details** including doctor names and times
+
+## 🏗️ Architecture
+
+### Tech Stack
+
+- **Frontend**: Next.js 14 with TypeScript and Tailwind CSS
+- **Scraping**: Playwright with Chromium browser
+- **Caching**: In-memory Map (5-minute TTL)
+- **Proxy**: https-proxy-agent with rotation support
+
+### Project Structure
+
+```
+├── app/
+│   ├── api/scrape/route.ts    # API endpoint for scraping
+│   ├── page.tsx               # Main UI component
+│   └── layout.tsx             # Root layout
+├── lib/
+│   ├── aspit-scraper.ts       # Core scraping logic
+│   └── proxy-helper.ts        # Proxy rotation utilities
+├── public/                    # Static assets
+└── package.json
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🔧 Configuration
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Environment Variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Create a `.env.local` file:
 
-## Learn More
+```env
+# Optional: Comma-separated list of proxy URLs
+PROXY_LIST=http://proxy1:port,http://proxy2:port
+```
 
-To learn more about Next.js, take a look at the following resources:
+### Target URL
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+The scraper is currently configured for:
+```
+https://timebestilling.aspit.no/#/p3775/services/15/appointment/54/calendar#calendar-title
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 📊 Data Structure
 
-## Deploy on Vercel
+### API Response
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```typescript
+{
+  clinic: string;
+  availableDates: Array<{
+    date: string;    // YYYY-MM-DD format
+    count: number;   // Number of available slots
+  }>;
+  slots: Array<{
+    date: string;    // YYYY-MM-DD format
+    time: string;    // HH:MM format
+    doctor?: string; // Doctor name
+  }>;
+  cached: boolean;
+  scrapedAt: string;
+}
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 🎨 UI Features
+
+### Month Navigation
+- **Previous/Next buttons** for month browsing
+- **Quick jump** to months with appointments
+- **Current month display** with appointment counts
+
+### Date Selection
+- **Interactive date cards** with slot counts
+- **Visual selection states** with blue highlighting
+- **Empty state handling** for months without appointments
+
+### Time Slots
+- **Date-specific filtering** of appointment times
+- **Doctor information** display
+- **Professional card layout** with availability status
+
+## 🔍 How It Works
+
+1. **Playwright launches** a headless Chromium browser
+2. **Navigates to target URL** with optional proxy rotation
+3. **Intercepts XHR/fetch requests** to capture API responses
+4. **Parses JSON data** to extract availability information
+5. **Maps doctor IDs** to names from therapist data
+6. **Returns structured data** with dates and time slots
+7. **Caches results** in memory for 5 minutes
+
+## 🚨 Limitations (MVP)
+
+- **No database storage** - data is ephemeral
+- **Manual triggering only** - no automated scheduling
+- **Single clinic support** - hardcoded to Aspit
+- **In-memory caching** - lost on server restart
+- **No user authentication** - public access only
+
+## 🛠️ Development
+
+### Available Scripts
+
+```bash
+npm run dev      # Start development server
+npm run build    # Build for production
+npm run start    # Start production server
+```
+
+### Testing
+
+The scraper can be tested by:
+
+1. Opening the browser interface
+2. Clicking "Fetch Availability"
+3. Checking the browser console for any errors
+4. Verifying appointment data appears correctly
+
+## 📝 Notes
+
+This is a **proof-of-concept MVP** designed for client demonstration. It's not production-ready and should not be used for actual booking systems without significant modifications.
+
+### Future Enhancements
+
+If the project moves forward, consider:
+
+- Database integration (PostgreSQL/MongoDB)
+- Job queue system (BullMQ/Redis)
+- Multiple clinic support
+- User authentication
+- Automated scheduling
+- Advanced proxy health tracking
+- Unit and integration tests
+
+## 📄 License
+
+This project is for demonstration purposes only.
+
+## 🤝 Contributing
+
+This is a client demonstration project. Please contact the project owner for any questions or modifications.
+
+---
+
+**Built with ❤️ for clinic availability monitoring**
