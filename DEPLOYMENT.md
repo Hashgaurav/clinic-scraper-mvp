@@ -36,8 +36,14 @@
    - Deploy automatically
 
 2. **Environment Variables**
-   - Add `PROXY_LIST` if using proxies
-   - No other configuration needed
+   - **Required**: Add `TARGET_CLINIC_URL` with your clinic booking URL
+   - **Optional**: Add `PROXY_LIST` if using proxies
+   - Set these in Vercel dashboard → Project Settings → Environment Variables
+
+3. **Vercel Configuration**
+   - The `vercel.json` file is included for proper function timeout settings
+   - Scraping operations are set to 60-second timeout
+   - No additional configuration needed
 
 ### Docker Deployment
 
