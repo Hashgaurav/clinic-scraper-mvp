@@ -56,6 +56,59 @@ export default function Home() {
     }
   };
 
+  const fetchAvailabilityForMonth = async (month: Date) => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const monthParam = month.toISOString().slice(0, 7); // YYYY-MM format
+      const response = await fetch(`/api/scrape?month=${monthParam}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to scrape data for month');
+      }
+
+      // Merge new data with existing result, or create new result
+      setResult(prevResult => {
+        if (!prevResult) {
+          return data;
+        }
+        
+        // Merge available dates and slots
+        const mergedAvailableDates = [...prevResult.availableDates];
+        const mergedSlots = [...prevResult.slots];
+        
+        // Add new dates that don't exist
+        data.availableDates.forEach((newDate: any) => {
+          if (!mergedAvailableDates.find(d => d.date === newDate.date)) {
+            mergedAvailableDates.push(newDate);
+          }
+        });
+        
+        // Add new slots that don't exist
+        data.slots.forEach((newSlot: any) => {
+          if (!mergedSlots.find(s => s.date === newSlot.date && s.time === newSlot.time)) {
+            mergedSlots.push(newSlot);
+          }
+        });
+        
+        return {
+          ...prevResult,
+          availableDates: mergedAvailableDates.sort((a, b) => a.date.localeCompare(b.date)),
+          slots: mergedSlots.sort((a, b) => {
+            const dateCompare = a.date.localeCompare(b.date);
+            return dateCompare !== 0 ? dateCompare : a.time.localeCompare(b.time);
+          })
+        };
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch month data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
     return date.toLocaleDateString('en-US', { 
@@ -74,17 +127,19 @@ export default function Home() {
     setSelectedDate(date);
   };
 
-  const navigateMonth = (direction: 'prev' | 'next') => {
-    setCurrentMonth(prev => {
-      const newMonth = new Date(prev);
-      if (direction === 'prev') {
-        newMonth.setMonth(prev.getMonth() - 1);
-      } else {
-        newMonth.setMonth(prev.getMonth() + 1);
-      }
-      return newMonth;
-    });
+  const navigateMonth = async (direction: 'prev' | 'next') => {
+    const newMonth = new Date(currentMonth);
+    if (direction === 'prev') {
+      newMonth.setMonth(currentMonth.getMonth() - 1);
+    } else {
+      newMonth.setMonth(currentMonth.getMonth() + 1);
+    }
+    
+    setCurrentMonth(newMonth);
     setSelectedDate(null); // Clear selected date when changing months
+    
+    // Fetch data for the new month
+    await fetchAvailabilityForMonth(newMonth);
   };
 
   const formatMonthYear = (date: Date) => {
@@ -286,9 +341,10 @@ export default function Home() {
                             {getMonthsWithAppointments().map(({ monthStr, date, count }) => (
                               <button
                                 key={monthStr}
-                                onClick={() => {
+                                onClick={async () => {
                                   setCurrentMonth(date);
                                   setSelectedDate(null);
+                                  await fetchAvailabilityForMonth(date);
                                 }}
                                 className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                                   currentMonth.toISOString().slice(0, 7) === monthStr

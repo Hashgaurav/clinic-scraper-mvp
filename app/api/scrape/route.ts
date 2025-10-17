@@ -19,9 +19,24 @@ export async function GET(request: NextRequest) {
     
     const { searchParams } = new URL(request.url);
     const proxy = searchParams.get('proxy') || undefined;
+    const monthParam = searchParams.get('month');
     
-    // Check cache first
-    const cacheKey = `${targetUrl}-${proxy || 'no-proxy'}`;
+    // Parse month parameter if provided
+    let targetMonth: Date | undefined;
+    if (monthParam) {
+      try {
+        targetMonth = new Date(monthParam);
+        if (isNaN(targetMonth.getTime())) {
+          targetMonth = undefined;
+        }
+      } catch (e) {
+        targetMonth = undefined;
+      }
+    }
+    
+    // Check cache first (include month in cache key)
+    const monthKey = targetMonth ? `-${targetMonth.getFullYear()}-${targetMonth.getMonth()}` : '';
+    const cacheKey = `${targetUrl}-${proxy || 'no-proxy'}${monthKey}`;
     const cached = cache.get(cacheKey);
     
     if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
@@ -33,10 +48,10 @@ export async function GET(request: NextRequest) {
       });
     }
     
-    console.log('Scraping target URL from environment variables');
+    console.log(`Scraping target URL from environment variables${targetMonth ? ` for month ${targetMonth.getFullYear()}-${targetMonth.getMonth() + 1}` : ''}`);
     
     // Scrape the data
-    const result = await scrapeAspit(targetUrl, proxy);
+    const result = await scrapeAspit(targetUrl, proxy, targetMonth);
     
     // Cache the result
     cache.set(cacheKey, {

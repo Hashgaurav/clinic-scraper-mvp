@@ -21,7 +21,7 @@ export interface ScrapingResult {
   error?: string;
 }
 
-export async function scrapeAspit(url: string, proxy?: string): Promise<ScrapingResult> {
+export async function scrapeAspit(url: string, proxy?: string, targetMonth?: Date): Promise<ScrapingResult> {
   let browser: Browser | null = null;
   
   try {
@@ -75,15 +75,21 @@ export async function scrapeAspit(url: string, proxy?: string): Promise<Scraping
       }
     });
     
-    // Navigate to the page
-    console.log(`Navigating to: ${url}`);
-    await page.goto(url, { 
-      waitUntil: 'networkidle',
-      timeout: 30000 
-    });
-    
-    // Wait for calendar/booking interface to load
-    await page.waitForTimeout(3000);
+        // Navigate to the page
+        console.log(`Navigating to: ${url}`);
+        await page.goto(url, {
+          waitUntil: 'networkidle',
+          timeout: 30000
+        });
+
+        // Wait for calendar/booking interface to load
+        await page.waitForTimeout(3000);
+
+        // If target month is specified, navigate to that month
+        if (targetMonth) {
+          console.log(`Navigating to month: ${targetMonth.getFullYear()}-${targetMonth.getMonth() + 1}`);
+          await navigateToMonth(page, targetMonth);
+        }
     
     // Try to find and click calendar elements to trigger API calls
     try {
@@ -226,6 +232,68 @@ function parseAvailabilityFromResponses(responses: any[]): { slots: Availability
   availableDates.sort((a, b) => a.date.localeCompare(b.date));
   
   return { slots: sortedSlots, availableDates };
+}
+
+async function navigateToMonth(page: Page, targetMonth: Date): Promise<void> {
+  try {
+    const currentDate = new Date();
+    const monthsDiff = (targetMonth.getFullYear() - currentDate.getFullYear()) * 12 + 
+                      (targetMonth.getMonth() - currentDate.getMonth());
+    
+    if (monthsDiff === 0) {
+      // Already on the target month
+      return;
+    }
+
+    // Look for month navigation buttons
+    const nextButton = page.locator('[class*="next"], [class*="forward"], [class*="arrow-right"]').first();
+    const prevButton = page.locator('[class*="prev"], [class*="back"], [class*="arrow-left"]').first();
+    
+    const clicksNeeded = Math.abs(monthsDiff);
+    const isNext = monthsDiff > 0;
+    
+    for (let i = 0; i < clicksNeeded; i++) {
+      try {
+        if (isNext) {
+          if (await nextButton.isVisible()) {
+            await nextButton.click();
+          } else {
+            // Try alternative selectors
+            const altNext = page.locator('button:has-text(">"), button:has-text("Next"), [aria-label*="next"]').first();
+            if (await altNext.isVisible()) {
+              await altNext.click();
+            }
+          }
+        } else {
+          if (await prevButton.isVisible()) {
+            await prevButton.click();
+          } else {
+            // Try alternative selectors
+            const altPrev = page.locator('button:has-text("<"), button:has-text("Prev"), [aria-label*="previous"]').first();
+            if (await altPrev.isVisible()) {
+              await altPrev.click();
+            }
+          }
+        }
+        
+        // Wait for the month to load
+        await page.waitForTimeout(2000);
+        
+        // Wait for any API calls to complete
+        await page.waitForTimeout(1000);
+        
+      } catch (e) {
+        console.log(`Month navigation attempt ${i + 1} failed:`, e);
+        // Continue trying other methods
+      }
+    }
+    
+    console.log(`Navigated to target month: ${targetMonth.getFullYear()}-${targetMonth.getMonth() + 1}`);
+    
+  } catch (error) {
+    console.log('Month navigation failed:', error);
+    // Continue with scraping even if month navigation fails
+  }
 }
 
 function extractSlotsFromObject(obj: any, path: string = '', doctorMap: { [key: string]: string } = {}): AvailabilitySlot[] {
