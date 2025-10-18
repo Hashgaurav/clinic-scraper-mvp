@@ -11,6 +11,8 @@ A minimal proof-of-concept scraper for extracting appointment availability from 
 - **In-memory caching** (5-minute TTL)
 - **Proxy rotation** support
 - **Professional UI** with responsive design
+- **Comprehensive data extraction** (45+ slots, 143+ dates)
+- **Dynamic month loading** with real-time updates
 
 ## 🚀 Quick Start
 
