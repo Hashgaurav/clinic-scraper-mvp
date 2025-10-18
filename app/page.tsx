@@ -599,7 +599,11 @@ export default function Home() {
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-blue-500 mt-1">•</span>
-                  <span>Ready for production expansion</span>
+                  <span>For demo purposes only</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-blue-500 mt-1">•</span>
+                  <span>Slot availability is not 100% synced in thsi MVP</span>
                 </li>
               </ul>
             </div>
