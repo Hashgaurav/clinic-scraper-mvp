@@ -58,19 +58,53 @@ export async function scrapeAspit(url: string, proxy?: string, targetMonth?: Dat
       const responseUrl = response.url();
       
       // Look for API endpoints that might contain availability data
-      if (responseUrl.includes('api') || responseUrl.includes('calendar') || responseUrl.includes('appointment') || responseUrl.includes('availability')) {
+      if (responseUrl.includes('api') || 
+          responseUrl.includes('calendar') || 
+          responseUrl.includes('appointment') || 
+          responseUrl.includes('availability') ||
+          responseUrl.includes('booking') ||
+          responseUrl.includes('time') ||
+          responseUrl.includes('slot') ||
+          responseUrl.includes('service') ||
+          responseUrl.includes('clinic') ||
+          responseUrl.includes('doctor') ||
+          responseUrl.includes('schedule') ||
+          responseUrl.includes('date') ||
+          responseUrl.includes('month') ||
+          responseUrl.includes('week') ||
+          (responseUrl.includes('aspit.no') && (responseUrl.includes('json') || responseUrl.includes('data'))) ||
+          (responseUrl.includes('timebestilling') && (responseUrl.includes('json') || responseUrl.includes('data')))) {
         try {
           const contentType = response.headers()['content-type'] || '';
-          if (contentType.includes('application/json')) {
+          if (contentType.includes('application/json') || contentType.includes('text/json')) {
             const data = await response.json();
             apiResponses.push({
               url: responseUrl,
               data,
-              status: response.status()
+              status: response.status(),
+              headers: response.headers(),
+              timestamp: new Date().toISOString()
             });
+            console.log(`Captured API response from: ${responseUrl} (${response.status()})`);
           }
         } catch (e) {
-          // Ignore non-JSON responses
+          // Try to capture as text if JSON parsing fails
+          try {
+            const text = await response.text();
+            if (text && text.length > 0) {
+              apiResponses.push({
+                url: responseUrl,
+                data: text,
+                status: response.status(),
+                headers: response.headers(),
+                timestamp: new Date().toISOString(),
+                isText: true
+              });
+              console.log(`Captured text response from: ${responseUrl} (${response.status()})`);
+            }
+          } catch (textError) {
+            // Ignore if both JSON and text parsing fail
+          }
         }
       }
     });
@@ -84,6 +118,33 @@ export async function scrapeAspit(url: string, proxy?: string, targetMonth?: Dat
 
         // Wait for calendar/booking interface to load
         await page.waitForTimeout(3000);
+        
+        // Check if page loaded successfully
+        const pageTitle = await page.title();
+        console.log(`Page title: ${pageTitle}`);
+        
+        // Check for error messages
+        const errorElements = await page.locator('[class*="error"], [class*="Error"], .error-message, .alert-error').all();
+        if (errorElements.length > 0) {
+          for (const errorElement of errorElements) {
+            const errorText = await errorElement.textContent();
+            if (errorText) {
+              console.log(`Error found on page: ${errorText}`);
+            }
+          }
+        }
+        
+        // Check if we're on the right page
+        const currentUrl = page.url();
+        console.log(`Current URL: ${currentUrl}`);
+        
+        // If the page shows an error, try to refresh or navigate differently
+        const pageContent = await page.content();
+        if (pageContent.includes('appErrorMessage') || pageContent.includes('Prøv på nytt')) {
+          console.log('Page shows error, trying to refresh...');
+          await page.reload({ waitUntil: 'networkidle' });
+          await page.waitForTimeout(5000);
+        }
 
         // If target month is specified, navigate to that month
         if (targetMonth) {
@@ -91,43 +152,117 @@ export async function scrapeAspit(url: string, proxy?: string, targetMonth?: Dat
           await navigateToMonth(page, targetMonth);
         }
     
-    // Try to find and click calendar elements to trigger API calls
+    // More comprehensive calendar interaction to load all available dates
     try {
-      // Look for calendar navigation buttons or date selectors
-      const calendarElements = await page.locator('[class*="calendar"], [class*="date"], [class*="month"], [class*="day"]').first();
-      if (await calendarElements.isVisible()) {
-        await calendarElements.click();
-        await page.waitForTimeout(2000);
+      // Wait for calendar to fully load
+      await page.waitForTimeout(3000);
+      
+      // Try to interact with calendar elements to trigger more API calls
+      const calendarSelectors = [
+        '[class*="calendar"]',
+        '[class*="date"]', 
+        '[class*="month"]',
+        '[class*="day"]',
+        '[class*="appointment"]',
+        '[class*="booking"]',
+        '.calendar',
+        '.date-picker',
+        '.month-view'
+      ];
+      
+      for (const selector of calendarSelectors) {
+        try {
+          const elements = await page.locator(selector).all();
+          for (const element of elements.slice(0, 2)) { // Try first 2 elements of each type
+            if (await element.isVisible()) {
+              await element.click();
+              await page.waitForTimeout(1500);
+            }
+          }
+        } catch (e) {
+          // Continue if selector fails
+        }
       }
-    } catch (e) {
-      console.log('No calendar elements found to interact with');
-    }
-    
-    // Try to trigger more API calls by interacting with the page
-    try {
-      // Look for any buttons that might load more data
-      const buttons = await page.locator('button, [role="button"]').all();
-      for (const button of buttons.slice(0, 3)) { // Only try first 3 buttons
+      
+      // Try to navigate through months to trigger more API calls
+      const nextButtons = await page.locator('[class*="next"], [class*="forward"], [class*="arrow-right"], button:has-text(">"), button:has-text("Next")').all();
+      for (const button of nextButtons.slice(0, 2)) {
         try {
           if (await button.isVisible()) {
             await button.click();
+            await page.waitForTimeout(2000);
+            // Go back to original month
+            const prevButtons = await page.locator('[class*="prev"], [class*="back"], [class*="arrow-left"], button:has-text("<"), button:has-text("Prev")').all();
+            for (const prevButton of prevButtons.slice(0, 1)) {
+              if (await prevButton.isVisible()) {
+                await prevButton.click();
+                await page.waitForTimeout(2000);
+                break;
+              }
+            }
+          }
+        } catch (e) {
+          // Continue if navigation fails
+        }
+      }
+      
+      // Try clicking on visible date elements to trigger more data loading
+      const dateElements = await page.locator('[class*="date"], [class*="day"], [data-date], [data-day], [class*="available"], [class*="bookable"]').all();
+      console.log(`Found ${dateElements.length} date elements to interact with`);
+      
+      for (const dateElement of dateElements.slice(0, 10)) { // Try first 10 date elements
+        try {
+          if (await dateElement.isVisible()) {
+            console.log('Clicking on date element to load time slots');
+            await dateElement.click();
+            await page.waitForTimeout(2000); // Wait longer for time slots to load
+            
+            // Try to scroll to make sure the element is visible
+            await dateElement.scrollIntoViewIfNeeded();
             await page.waitForTimeout(1000);
           }
         } catch (e) {
-          // Continue if button click fails
+          console.log(`Failed to click date element: ${e}`);
         }
       }
+      
+      // Also try clicking on any clickable elements that might load more data
+      const clickableElements = await page.locator('button, [role="button"], [onclick], [class*="click"], [class*="select"]').all();
+      console.log(`Found ${clickableElements.length} clickable elements`);
+      
+      for (const element of clickableElements.slice(0, 5)) { // Try first 5 clickable elements
+        try {
+          if (await element.isVisible()) {
+            const text = await element.textContent();
+            if (text && (text.includes('date') || text.includes('time') || text.includes('slot') || text.includes('book'))) {
+              console.log(`Clicking on element with text: ${text}`);
+              await element.click();
+              await page.waitForTimeout(1500);
+            }
+          }
+        } catch (e) {
+          // Continue if click fails
+        }
+      }
+      
     } catch (e) {
-      console.log('No interactive elements found');
+      console.log('Calendar interaction failed:', e);
     }
     
-    // Wait a bit more for any delayed API calls
-    await page.waitForTimeout(2000);
+    // Wait longer for all API calls to complete
+    await page.waitForTimeout(5000);
     
     console.log(`Captured ${apiResponses.length} API responses`);
     
+    // Log all captured URLs for debugging
+    for (const response of apiResponses) {
+      console.log(`Response URL: ${response.url}`);
+    }
+    
     // Parse the captured data to extract availability
     const { slots, availableDates } = parseAvailabilityFromResponses(apiResponses);
+    
+    console.log(`Extracted ${slots.length} slots and ${availableDates.length} available dates`);
     
     return {
       clinic: 'Aspit Clinic',
@@ -156,10 +291,15 @@ function parseAvailabilityFromResponses(responses: any[]): { slots: Availability
   const doctorMap: { [key: string]: string } = {};
   const availableDatesSet = new Set<string>();
   
-  // First pass: extract doctor information
+  console.log(`Parsing ${responses.length} API responses for availability data`);
+  
+  // First pass: extract doctor information and log response details
   for (const response of responses) {
     try {
       const data = response.data;
+      console.log(`Processing response from: ${response.url}`);
+      
+      // Extract doctor/therapist information
       if (data && data.Therapists && Array.isArray(data.Therapists)) {
         for (const therapist of data.Therapists) {
           if (therapist.Oid && therapist.Name) {
@@ -167,8 +307,32 @@ function parseAvailabilityFromResponses(responses: any[]): { slots: Availability
           }
         }
       }
+      
+      // Also try alternative doctor field names
+      if (data && data.Doctors && Array.isArray(data.Doctors)) {
+        for (const doctor of data.Doctors) {
+          if (doctor.id && doctor.name) {
+            doctorMap[doctor.id.toString()] = doctor.name;
+          }
+        }
+      }
+      
+      // Log the structure of each response for debugging
+      if (data && typeof data === 'object') {
+        console.log(`Response keys: ${Object.keys(data).join(', ')}`);
+        if (data.AvailableSlots) {
+          console.log(`Found AvailableSlots: ${data.AvailableSlots.length} items`);
+        }
+        if (data.Slots) {
+          console.log(`Found Slots: ${data.Slots.length} items`);
+        }
+        if (data.Appointments) {
+          console.log(`Found Appointments: ${data.Appointments.length} items`);
+        }
+      }
+      
     } catch (e) {
-      // Skip invalid responses
+      console.log(`Error processing response: ${e}`);
     }
   }
   
@@ -183,15 +347,43 @@ function parseAvailabilityFromResponses(responses: any[]): { slots: Availability
         const possibleSlots = extractSlotsFromObject(data, '', doctorMap);
         slots.push(...possibleSlots);
         
-        // Extract available dates from API response
-        if (data.AvailableDates && Array.isArray(data.AvailableDates)) {
-          for (const dateStr of data.AvailableDates) {
-            availableDatesSet.add(dateStr);
+        // Extract available dates from various possible fields
+        const dateFields = ['AvailableDates', 'availableDates', 'dates', 'Dates', 'available_dates', 'available-dates'];
+        for (const field of dateFields) {
+          if (data[field] && Array.isArray(data[field])) {
+            for (const dateItem of data[field]) {
+              if (typeof dateItem === 'string') {
+                availableDatesSet.add(dateItem);
+              } else if (dateItem && dateItem.date) {
+                availableDatesSet.add(dateItem.date);
+              }
+            }
+          }
+        }
+        
+        // Also extract dates from slots themselves
+        if (data.AvailableSlots && Array.isArray(data.AvailableSlots)) {
+          for (const slot of data.AvailableSlots) {
+            if (slot.Date) {
+              availableDatesSet.add(slot.Date);
+            }
+            if (slot.date) {
+              availableDatesSet.add(slot.date);
+            }
+          }
+        }
+        
+        // Try to extract from nested objects
+        if (data.Data && data.Data.AvailableSlots) {
+          for (const slot of data.Data.AvailableSlots) {
+            if (slot.Date) {
+              availableDatesSet.add(slot.Date);
+            }
           }
         }
       }
     } catch (e) {
-      // Skip invalid responses
+      console.log(`Error extracting slots from response: ${e}`);
     }
   }
   
@@ -321,6 +513,45 @@ function extractSlotsFromObject(obj: any, path: string = '', doctorMap: { [key: 
               });
             }
           }
+        }
+      }
+    }
+    
+    // Try alternative slot structures
+    if (obj.AvailableSlots && Array.isArray(obj.AvailableSlots)) {
+      for (const slot of obj.AvailableSlots) {
+        if (slot.Date && slot.Time) {
+          slots.push({
+            date: slot.Date,
+            time: slot.Time,
+            doctor: slot.Doctor || slot.Therapist || slot.Practitioner
+          });
+        }
+      }
+    }
+    
+    // Try nested data structures
+    if (obj.Data && obj.Data.AvailableSlots && Array.isArray(obj.Data.AvailableSlots)) {
+      for (const slot of obj.Data.AvailableSlots) {
+        if (slot.Date && slot.Time) {
+          slots.push({
+            date: slot.Date,
+            time: slot.Time,
+            doctor: slot.Doctor || slot.Therapist || slot.Practitioner
+          });
+        }
+      }
+    }
+    
+    // Try different field names
+    if (obj.Slots && Array.isArray(obj.Slots)) {
+      for (const slot of obj.Slots) {
+        if (slot.date && slot.time) {
+          slots.push({
+            date: slot.date,
+            time: slot.time,
+            doctor: slot.doctor || slot.therapist || slot.practitioner
+          });
         }
       }
     }
