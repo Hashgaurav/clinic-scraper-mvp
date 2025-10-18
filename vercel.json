@@ -3,8 +3,5 @@
     "app/api/scrape/route.ts": {
       "maxDuration": 60
     }
-  },
-  "env": {
-    "TARGET_CLINIC_URL": "@target_clinic_url"
   }
 }
