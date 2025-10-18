@@ -34,7 +34,15 @@ export async function scrapeAspit(url: string, proxy?: string, targetMonth?: Dat
     // Launch browser with proxy configuration
     const launchOptions: any = {
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
+      args: [
+        '--no-sandbox', 
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--no-first-run',
+        '--no-zygote',
+        '--disable-gpu'
+      ]
     };
     
     if (proxyUrl) {
@@ -43,7 +51,24 @@ export async function scrapeAspit(url: string, proxy?: string, targetMonth?: Dat
       };
     }
     
-    browser = await chromium.launch(launchOptions);
+    // Try to launch browser with error handling
+    try {
+      browser = await chromium.launch(launchOptions);
+    } catch (browserError) {
+      console.error('Failed to launch browser:', browserError);
+      
+      // Try to install browsers and retry
+      try {
+        console.log('Attempting to install Playwright browsers...');
+        const { execSync } = require('child_process');
+        execSync('npx playwright install chromium', { stdio: 'inherit' });
+        browser = await chromium.launch(launchOptions);
+        console.log('Successfully launched browser after installation');
+      } catch (installError) {
+        console.error('Failed to install browsers:', installError);
+        throw new Error(`Browser launch failed: ${browserError.message}. Installation failed: ${installError.message}`);
+      }
+    }
     const context = await browser.newContext({
       userAgent,
       viewport: { width: 1280, height: 720 }
