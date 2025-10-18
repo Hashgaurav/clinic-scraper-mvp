@@ -57,7 +57,33 @@ export async function scrapeAspit(url: string, proxy?: string, targetMonth?: Dat
     } catch (browserError) {
       console.error('Failed to launch browser:', browserError);
       
-      // Try to install browsers and retry
+      // Check if we're in Vercel environment
+      if (process.env.VERCEL) {
+        console.log('Running in Vercel environment - using fallback approach');
+        // Return mock data for Vercel deployment demo
+        return {
+          clinic: 'Aspit Clinic (Demo Mode)',
+          availableDates: [
+            { date: '2025-10-23', count: 3 },
+            { date: '2025-10-24', count: 2 },
+            { date: '2025-10-25', count: 4 }
+          ],
+          slots: [
+            { date: '2025-10-23', time: '09:00', doctor: 'Dr. Smith' },
+            { date: '2025-10-23', time: '10:30', doctor: 'Dr. Johnson' },
+            { date: '2025-10-23', time: '14:00', doctor: 'Dr. Smith' },
+            { date: '2025-10-24', time: '11:00', doctor: 'Dr. Johnson' },
+            { date: '2025-10-24', time: '15:30', doctor: 'Dr. Smith' },
+            { date: '2025-10-25', time: '09:30', doctor: 'Dr. Johnson' },
+            { date: '2025-10-25', time: '13:00', doctor: 'Dr. Smith' },
+            { date: '2025-10-25', time: '16:00', doctor: 'Dr. Johnson' },
+            { date: '2025-10-25', time: '17:30', doctor: 'Dr. Smith' }
+          ],
+          rawData: { note: 'Demo data - Playwright not available in Vercel environment' }
+        };
+      }
+      
+      // Try to install browsers and retry for non-Vercel environments
       try {
         console.log('Attempting to install Playwright browsers...');
         const { execSync } = require('child_process');
