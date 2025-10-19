@@ -281,7 +281,25 @@ export default function Home() {
                   
                   {/* Clinic Info */}
                   <div className="bg-gray-50 rounded-lg p-4">
-                    <h3 className="font-semibold text-gray-800 mb-2">🏥 {result.clinic}</h3>
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="font-semibold text-gray-800">🏥 {result.clinic}</h3>
+                      {result.rawData?.environment === 'vercel' && (
+                        <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded-full text-xs font-medium">
+                          Demo Mode
+                        </span>
+                      )}
+                    </div>
+                    {result.rawData?.environment === 'vercel' && (
+                      <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                        <div className="flex items-center gap-2 mb-1">
+                          <svg className="h-4 w-4 text-orange-600" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                          </svg>
+                          <span className="font-medium text-orange-800">Demo Mode Active</span>
+                        </div>
+                        <p className="text-orange-700 text-sm">Showing sample data - Playwright browsers not available in Vercel environment</p>
+                      </div>
+                    )}
                     {result.error && (
                       <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                         <p className="text-yellow-800 text-sm">⚠️ {result.error}</p>

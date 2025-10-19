@@ -51,39 +51,117 @@ export async function scrapeAspit(url: string, proxy?: string, targetMonth?: Dat
       };
     }
     
-    // Try to launch browser with error handling
+    // Check if we're in Vercel environment first
+    if (process.env.VERCEL) {
+      console.log('Running in Vercel environment - using demo data');
+      // Return comprehensive mock data for Vercel deployment demo
+      return {
+        clinic: 'Aspit Clinic (Demo Mode)',
+        availableDates: [
+          { date: '2025-10-23', count: 3 },
+          { date: '2025-10-24', count: 2 },
+          { date: '2025-10-25', count: 4 },
+          { date: '2025-10-26', count: 2 },
+          { date: '2025-10-27', count: 1 },
+          { date: '2025-10-28', count: 3 },
+          { date: '2025-10-29', count: 2 },
+          { date: '2025-10-30', count: 4 },
+          { date: '2025-10-31', count: 1 },
+          { date: '2025-11-01', count: 3 },
+          { date: '2025-11-02', count: 2 },
+          { date: '2025-11-03', count: 4 },
+          { date: '2025-11-04', count: 1 },
+          { date: '2025-11-05', count: 3 },
+          { date: '2025-11-06', count: 2 },
+          { date: '2025-11-07', count: 4 },
+          { date: '2025-11-08', count: 1 },
+          { date: '2025-11-09', count: 3 },
+          { date: '2025-11-10', count: 2 },
+          { date: '2025-11-11', count: 4 },
+          { date: '2025-11-12', count: 1 },
+          { date: '2025-11-13', count: 3 },
+          { date: '2025-11-14', count: 2 },
+          { date: '2025-11-15', count: 4 }
+        ],
+        slots: [
+          { date: '2025-10-23', time: '09:00', doctor: 'Dr. Smith' },
+          { date: '2025-10-23', time: '10:30', doctor: 'Dr. Johnson' },
+          { date: '2025-10-23', time: '14:00', doctor: 'Dr. Smith' },
+          { date: '2025-10-24', time: '11:00', doctor: 'Dr. Johnson' },
+          { date: '2025-10-24', time: '15:30', doctor: 'Dr. Smith' },
+          { date: '2025-10-25', time: '09:30', doctor: 'Dr. Johnson' },
+          { date: '2025-10-25', time: '13:00', doctor: 'Dr. Smith' },
+          { date: '2025-10-25', time: '16:00', doctor: 'Dr. Johnson' },
+          { date: '2025-10-25', time: '17:30', doctor: 'Dr. Smith' },
+          { date: '2025-10-26', time: '10:00', doctor: 'Dr. Johnson' },
+          { date: '2025-10-26', time: '14:30', doctor: 'Dr. Smith' },
+          { date: '2025-10-27', time: '11:30', doctor: 'Dr. Johnson' },
+          { date: '2025-10-28', time: '09:00', doctor: 'Dr. Smith' },
+          { date: '2025-10-28', time: '12:00', doctor: 'Dr. Johnson' },
+          { date: '2025-10-28', time: '15:00', doctor: 'Dr. Smith' },
+          { date: '2025-10-29', time: '10:30', doctor: 'Dr. Johnson' },
+          { date: '2025-10-29', time: '16:30', doctor: 'Dr. Smith' },
+          { date: '2025-10-30', time: '08:30', doctor: 'Dr. Johnson' },
+          { date: '2025-10-30', time: '11:00', doctor: 'Dr. Smith' },
+          { date: '2025-10-30', time: '13:30', doctor: 'Dr. Johnson' },
+          { date: '2025-10-30', time: '17:00', doctor: 'Dr. Smith' },
+          { date: '2025-10-31', time: '12:30', doctor: 'Dr. Johnson' },
+          { date: '2025-11-01', time: '09:00', doctor: 'Dr. Smith' },
+          { date: '2025-11-01', time: '11:30', doctor: 'Dr. Johnson' },
+          { date: '2025-11-01', time: '14:00', doctor: 'Dr. Smith' },
+          { date: '2025-11-02', time: '10:00', doctor: 'Dr. Johnson' },
+          { date: '2025-11-02', time: '15:30', doctor: 'Dr. Smith' },
+          { date: '2025-11-03', time: '08:00', doctor: 'Dr. Johnson' },
+          { date: '2025-11-03', time: '12:00', doctor: 'Dr. Smith' },
+          { date: '2025-11-03', time: '14:30', doctor: 'Dr. Johnson' },
+          { date: '2025-11-03', time: '17:30', doctor: 'Dr. Smith' },
+          { date: '2025-11-04', time: '13:00', doctor: 'Dr. Johnson' },
+          { date: '2025-11-05', time: '09:30', doctor: 'Dr. Smith' },
+          { date: '2025-11-05', time: '11:00', doctor: 'Dr. Johnson' },
+          { date: '2025-11-05', time: '16:00', doctor: 'Dr. Smith' },
+          { date: '2025-11-06', time: '10:30', doctor: 'Dr. Johnson' },
+          { date: '2025-11-06', time: '15:00', doctor: 'Dr. Smith' },
+          { date: '2025-11-07', time: '08:30', doctor: 'Dr. Johnson' },
+          { date: '2025-11-07', time: '12:30', doctor: 'Dr. Smith' },
+          { date: '2025-11-07', time: '14:00', doctor: 'Dr. Johnson' },
+          { date: '2025-11-07', time: '17:00', doctor: 'Dr. Smith' },
+          { date: '2025-11-08', time: '11:30', doctor: 'Dr. Johnson' },
+          { date: '2025-11-09', time: '09:00', doctor: 'Dr. Smith' },
+          { date: '2025-11-09', time: '13:30', doctor: 'Dr. Johnson' },
+          { date: '2025-11-09', time: '16:30', doctor: 'Dr. Smith' },
+          { date: '2025-11-10', time: '10:00', doctor: 'Dr. Johnson' },
+          { date: '2025-11-10', time: '15:00', doctor: 'Dr. Smith' },
+          { date: '2025-11-11', time: '08:00', doctor: 'Dr. Johnson' },
+          { date: '2025-11-11', time: '12:00', doctor: 'Dr. Smith' },
+          { date: '2025-11-11', time: '14:30', doctor: 'Dr. Johnson' },
+          { date: '2025-11-11', time: '17:00', doctor: 'Dr. Smith' },
+          { date: '2025-11-12', time: '11:00', doctor: 'Dr. Johnson' },
+          { date: '2025-11-13', time: '09:30', doctor: 'Dr. Smith' },
+          { date: '2025-11-13', time: '12:30', doctor: 'Dr. Johnson' },
+          { date: '2025-11-13', time: '15:30', doctor: 'Dr. Smith' },
+          { date: '2025-11-14', time: '10:30', doctor: 'Dr. Johnson' },
+          { date: '2025-11-14', time: '16:00', doctor: 'Dr. Smith' },
+          { date: '2025-11-15', time: '08:00', doctor: 'Dr. Johnson' },
+          { date: '2025-11-15', time: '11:30', doctor: 'Dr. Smith' },
+          { date: '2025-11-15', time: '13:00', doctor: 'Dr. Johnson' },
+          { date: '2025-11-15', time: '17:30', doctor: 'Dr. Smith' }
+        ],
+        rawData: { 
+          note: 'Demo data - Playwright not available in Vercel environment',
+          environment: 'vercel',
+          totalSlots: 60,
+          totalDates: 24
+        }
+      };
+    }
+
+    // Try to launch browser with error handling for non-Vercel environments
     try {
       browser = await chromium.launch(launchOptions);
     } catch (browserError) {
       console.error('Failed to launch browser:', browserError);
       
-      // Check if we're in Vercel environment
-      if (process.env.VERCEL) {
-        console.log('Running in Vercel environment - using fallback approach');
-        // Return mock data for Vercel deployment demo
-        return {
-          clinic: 'Aspit Clinic (Demo Mode)',
-          availableDates: [
-            { date: '2025-10-23', count: 3 },
-            { date: '2025-10-24', count: 2 },
-            { date: '2025-10-25', count: 4 }
-          ],
-          slots: [
-            { date: '2025-10-23', time: '09:00', doctor: 'Dr. Smith' },
-            { date: '2025-10-23', time: '10:30', doctor: 'Dr. Johnson' },
-            { date: '2025-10-23', time: '14:00', doctor: 'Dr. Smith' },
-            { date: '2025-10-24', time: '11:00', doctor: 'Dr. Johnson' },
-            { date: '2025-10-24', time: '15:30', doctor: 'Dr. Smith' },
-            { date: '2025-10-25', time: '09:30', doctor: 'Dr. Johnson' },
-            { date: '2025-10-25', time: '13:00', doctor: 'Dr. Smith' },
-            { date: '2025-10-25', time: '16:00', doctor: 'Dr. Johnson' },
-            { date: '2025-10-25', time: '17:30', doctor: 'Dr. Smith' }
-          ],
-          rawData: { note: 'Demo data - Playwright not available in Vercel environment' }
-        };
-      }
-      
-      // Try to install browsers and retry for non-Vercel environments
+      // Try to install browsers and retry
       try {
         console.log('Attempting to install Playwright browsers...');
         const { execSync } = require('child_process');
